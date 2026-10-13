@@ -5,15 +5,81 @@
   document.documentElement.classList.add('js');
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  /* ---------- Photos: try local file, then the nepa.gov.in copy, then a neutral placeholder ---------- */
+  document.addEventListener('error', function (e) {
+    var img = e.target;
+    if (!img || img.tagName !== 'IMG') return;
+    var list = (img.getAttribute('data-fallback') || '').split(' ').filter(Boolean);
+    if (!list.length) return;
+    img.setAttribute('data-fallback', list.slice(1).join(' '));
+    img.src = list[0];
+  }, true);
+
+  /* ---------- Facilities: "See More" toggle ---------- */
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('.fc-more');
+    if (!b) return;
+    var box = document.getElementById(b.getAttribute('aria-controls'));
+    var open = b.getAttribute('aria-expanded') !== 'true';
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (box) box.hidden = !open;
+  });
+
   /* ---------- HEADER: collapsible menu ---------- */
   function initNav() {
     var nav = document.getElementById('site-nav');
     if (!nav) return;
     var btn = nav.querySelector('.menu-toggle');
-    function set(open) { nav.classList.toggle('open', open); btn.setAttribute('aria-expanded', open ? 'true' : 'false'); }
+    var subs = [].slice.call(nav.querySelectorAll('li.has-sub'));
+    var desktop = window.matchMedia ? window.matchMedia('(min-width: 901px)') : { matches: window.innerWidth > 900 };
+
+    /* Open / close one dropdown and keep aria-expanded and the +/- sign in step */
+    function setSub(li, open) {
+      li.classList.toggle('open', open);
+      var t = li.querySelector(':scope > .sub-toggle');
+      if (!t) return;
+      t.setAttribute('aria-expanded', open ? 'true' : 'false');
+      var p = t.querySelector('.plus');
+      if (p) p.textContent = open ? '−' : '+';
+    }
+    function closeSubs(except) {
+      subs.forEach(function (li) { if (li !== except && !(except && li.contains(except))) setSub(li, false); });
+    }
+    function set(open) {
+      nav.classList.toggle('open', open);
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (!open) closeSubs(null);
+    }
+
     btn.addEventListener('click', function () { set(!nav.classList.contains('open')); });
-    nav.addEventListener('click', function (e) { if (e.target.closest('a')) set(false); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && nav.classList.contains('open')) { set(false); btn.focus(); } });
+
+    /* Dropdown toggles (Academy, Training of NEPA, Services ... and nested Faculty) */
+    subs.forEach(function (li) {
+      var t = li.querySelector(':scope > .sub-toggle');
+      if (!t) return;
+      t.addEventListener('click', function (e) {
+        e.preventDefault();
+        var willOpen = !li.classList.contains('open');
+        closeSubs(willOpen ? li : null);
+        setSub(li, willOpen);
+      });
+      /* desktop: hover opens the menu (CSS), so keep the +/- sign in sync */
+      li.addEventListener('mouseenter', function () { if (desktop.matches) setSub(li, true); });
+      li.addEventListener('mouseleave', function () { if (desktop.matches) setSub(li, false); });
+    });
+
+    /* Real links close the mobile menu; dropdown toggles must NOT (they only expand their list) */
+    nav.addEventListener('click', function (e) {
+      var a = e.target.closest('a');
+      if (!a || a.classList.contains('sub-toggle')) return;
+      set(false);
+    });
+    /* tap outside the menu closes any open dropdown */
+    document.addEventListener('click', function (e) { if (!e.target.closest('#site-nav')) closeSubs(null); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      if (nav.classList.contains('open')) { set(false); btn.focus(); } else closeSubs(null);
+    });
     window.addEventListener('resize', function () { if (window.innerWidth > 900) set(false); });
   }
 
@@ -62,15 +128,16 @@
 
   /* ---------- FOOTER: spam-safe email link ---------- */
   function initEmail() {
-    var m = document.getElementById('nepa-mail');
-    if (!m) return;
-    var addr = m.dataset.user + '@' + m.dataset.domain;
-    var a = document.createElement('a');
-    a.className = 'c-val';
-    a.href = 'mailto:' + addr;
-    a.textContent = addr;
-    a.setAttribute('aria-label', 'Email ' + m.dataset.user + ' at ' + m.dataset.domain.replace('.', ' dot '));
-    m.replaceWith(a);
+    /* every element carrying data-user + data-domain becomes a mailto link (footer and Contact Us page) */
+    [].slice.call(document.querySelectorAll('[data-user][data-domain]')).forEach(function (m) {
+      var addr = m.dataset.user + '@' + m.dataset.domain;
+      var a = document.createElement('a');
+      a.className = m.id === 'nepa-mail' ? 'c-val' : (m.className || '');
+      a.href = 'mailto:' + addr;
+      a.textContent = addr;
+      a.setAttribute('aria-label', 'Email ' + m.dataset.user + ' at ' + m.dataset.domain.replace('.', ' dot '));
+      m.replaceWith(a);
+    });
   }
 
   /* ---------- HOME: photo slider ---------- */
