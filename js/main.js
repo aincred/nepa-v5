@@ -134,7 +134,8 @@
       var a = document.createElement('a');
       a.className = m.id === 'nepa-mail' ? 'c-val' : (m.className || '');
       a.href = 'mailto:' + addr;
-      a.textContent = addr;
+      /* show the address in spam-safe form (name[at]domain[dot]in); the mailto link still opens the real address */
+      a.textContent = m.dataset.user + '[at]' + m.dataset.domain.replace(/\./g, '[dot]');
       a.setAttribute('aria-label', 'Email ' + m.dataset.user + ' at ' + m.dataset.domain.replace('.', ' dot '));
       m.replaceWith(a);
     });
